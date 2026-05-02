@@ -6,12 +6,83 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import List
 from dotenv import load_dotenv
-from agents import Agent, Runner, trace
+from openai import AsyncOpenAI
+from agents import (
+    Agent,
+    ModelSettings,
+    Runner,
+    trace,
+    set_default_openai_api,
+    set_default_openai_client,
+    set_tracing_disabled,
+)
 
 from context import SECURITY_RESEARCHER_INSTRUCTIONS, get_analysis_prompt, enhance_summary
 from mcp_servers import create_semgrep_server
 
 load_dotenv(override=True)
+
+_OPENROUTER_DEFAULT_BASE = "https://openrouter.ai/api/v1"
+# OpenRouter model ids use a provider prefix, e.g. openai/gpt-4.1-mini
+_OPENROUTER_DEFAULT_MODEL = "openai/gpt-4.1-mini"
+_OPENAI_DEFAULT_MODEL = "gpt-4.1-mini"
+# OpenRouter rejects huge max_tokens vs credits; cap completions when using OpenRouter.
+_OPENROUTER_DEFAULT_MAX_TOKENS = 4096
+
+
+def _parse_positive_int(env_name: str) -> int | None:
+    raw = (os.getenv(env_name) or "").strip()
+    if not raw:
+        return None
+    try:
+        n = int(raw)
+        return n if n > 0 else None
+    except ValueError:
+        return None
+
+
+def get_model_settings() -> ModelSettings:
+    """Cap completion tokens for OpenRouter credits; optional overrides via env."""
+    llm_cap = _parse_positive_int("LLM_MAX_TOKENS")
+    if llm_cap is not None:
+        return ModelSettings(max_tokens=llm_cap)
+
+    if (os.getenv("OPENROUTER_API_KEY") or "").strip():
+        or_cap = _parse_positive_int("OPENROUTER_MAX_TOKENS")
+        return ModelSettings(
+            max_tokens=or_cap if or_cap is not None else _OPENROUTER_DEFAULT_MAX_TOKENS
+        )
+
+    return ModelSettings()
+
+
+def configure_llm() -> None:
+    """If OPENROUTER_API_KEY is set, route LLM calls through OpenRouter (OpenAI-compatible API)."""
+    key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
+    if not key:
+        return
+
+    base_url = (os.getenv("OPENROUTER_BASE_URL") or _OPENROUTER_DEFAULT_BASE).rstrip("/")
+    client = AsyncOpenAI(base_url=base_url, api_key=key)
+    set_default_openai_client(client, use_for_tracing=False)
+    # OpenRouter exposes chat completions; the Agents SDK defaults to the Responses API on OpenAI.
+    set_default_openai_api("chat_completions")
+    # Avoid sending traces to api.openai.com without an OpenAI key.
+    set_tracing_disabled(True)
+
+
+configure_llm()
+
+
+def get_llm_model() -> str:
+    """Prefer LLM_MODEL, then OPENROUTER_MODEL, then provider-appropriate defaults."""
+    if os.getenv("LLM_MODEL"):
+        return os.getenv("LLM_MODEL", _OPENAI_DEFAULT_MODEL)
+    if os.getenv("OPENROUTER_MODEL"):
+        return os.getenv("OPENROUTER_MODEL", _OPENROUTER_DEFAULT_MODEL)
+    if (os.getenv("OPENROUTER_API_KEY") or "").strip():
+        return _OPENROUTER_DEFAULT_MODEL
+    return _OPENAI_DEFAULT_MODEL
 
 app = FastAPI(title="Cybersecurity Analyzer API")
 
@@ -65,9 +136,14 @@ def validate_request(request: AnalyzeRequest) -> None:
 
 
 def check_api_keys() -> None:
-    """Verify required API keys are configured."""
-    if not os.getenv("OPENAI_API_KEY"):
-        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
+    """Verify an LLM API key is configured (OpenAI and/or OpenRouter)."""
+    has_openai = bool(os.getenv("OPENAI_API_KEY"))
+    has_openrouter = bool((os.getenv("OPENROUTER_API_KEY") or "").strip())
+    if not has_openai and not has_openrouter:
+        raise HTTPException(
+            status_code=500,
+            detail="Configure OPENAI_API_KEY or OPENROUTER_API_KEY in your environment",
+        )
 
 
 def create_security_agent(semgrep_server) -> Agent:
@@ -75,7 +151,8 @@ def create_security_agent(semgrep_server) -> Agent:
     return Agent(
         name="Security Researcher",
         instructions=SECURITY_RESEARCHER_INSTRUCTIONS,
-        model="gpt-4.1-mini",
+        model=get_llm_model(),
+        model_settings=get_model_settings(),
         mcp_servers=[semgrep_server],
         output_type=SecurityReport,
     )

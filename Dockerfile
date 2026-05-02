@@ -18,10 +18,10 @@ RUN apt-get update && apt-get install -y \
 # Install uv for Python package management
 RUN pip install uv
 
-# Copy Python dependencies and install
+# Copy Python dependencies and install (semgrep is in pyproject.toml — CLI lives in .venv/bin)
 COPY backend/pyproject.toml backend/uv.lock* ./
 RUN uv sync --frozen
-RUN uv tool install semgrep
+ENV PATH="/app/.venv/bin:${PATH}"
 # Copy backend source
 COPY backend/ ./
 

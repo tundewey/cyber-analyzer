@@ -16,6 +16,10 @@ git clone https://github.com/ed-donner/cyber.git
 
 Then open this as a project in Cursor; then head into the week3 directory and start with guide "day1.part0" - right click and select "Open Preview".
 
+#### Deploy to AWS
+
+See **[aws/README.md](aws/README.md)** for ECR push scripts and step-by-step **App Runner** instructions. Copy **`.env.example`** to `.env` locally; mirror those variables (and secrets) in your AWS service configuration.
+
 #### Keep in mind
 
 - Please submit your community_contributions, including links to your repos, in the production repo community_contributions folder

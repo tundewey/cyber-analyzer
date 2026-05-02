@@ -12,6 +12,23 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ||
     ? 'http://localhost:8000' 
     : '');
 
+/** FastAPI HTTPException responses use { detail: string | object } */
+async function errorMessageFromResponse(response: Response): Promise<string> {
+  const status = response.status;
+  try {
+    const body = (await response.json()) as { detail?: unknown };
+    const { detail } = body;
+    if (typeof detail === 'string') {
+      return `Error (${status}): ${detail}`;
+    }
+    if (detail !== undefined && detail !== null) {
+      return `Error (${status}): ${JSON.stringify(detail)}`;
+    }
+  } catch {
+    // body was not JSON
+  }
+  return `HTTP error! status: ${status}`;
+}
 
 /**
  * Main application page for cybersecurity code analysis
@@ -59,7 +76,7 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(await errorMessageFromResponse(response));
       }
 
       const results: AnalysisResponse = await response.json();
