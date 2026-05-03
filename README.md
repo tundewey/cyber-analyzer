@@ -18,7 +18,7 @@ Then open this as a project in Cursor; then head into the week3 directory and st
 
 #### Deploy to AWS
 
-See **[aws/README.md](aws/README.md)** for ECR push scripts and step-by-step **App Runner** instructions. Copy **`.env.example`** to `.env` locally; mirror those variables (and secrets) in your AWS service configuration.
+See **[aws/README.md](aws/README.md)** for ECR push scripts and manual ECS / ALB notes. For **Terraform** (ECS Fargate + ALB + security groups), see **[terraform/README.md](terraform/README.md)**. Copy **`.env.example`** to `.env` locally; mirror those variables (and secrets) in Terraform **`terraform.tfvars`** or your AWS service configuration.
 
 #### Keep in mind
 

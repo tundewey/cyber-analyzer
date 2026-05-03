@@ -118,6 +118,12 @@ Do **not** paste production keys as plain text in the console if you can avoid i
 
 ---
 
+## Terraform (optional)
+
+Infrastructure as code for **ECS Fargate + ALB + security groups** lives in **`../terraform/`**. See **[terraform/README.md](../terraform/README.md)** for `init` / `apply` and `terraform.tfvars`.
+
+---
+
 ## Scripts reference
 
 | File | Purpose |

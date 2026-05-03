@@ -1,0 +1,21 @@
+# Copy to terraform.tfvars (gitignored) and fill in secrets.
+# terraform.tfvars is listed in .gitignore — do not commit it.
+
+aws_region = "us-east-1"
+
+# Optional: pin subnets if you do not want Terraform to use every subnet in the VPC.
+# public_subnet_ids = ["subnet-xxxxxxxx", "subnet-yyyyyyyy"]
+
+create_ecr_repository = false
+ecr_repository_name   = "cyber-analyzer"
+image_tag             = "latest"
+
+task_cpu    = 1024
+task_memory = 2048
+
+assign_public_ip = true
+
+semgrep_app_token    = "your-semgrep-token"
+openrouter_api_key   = "your-openrouter-key"
+openai_api_key       = ""
+openrouter_max_tokens = "4096"
